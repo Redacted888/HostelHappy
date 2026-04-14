@@ -157,3 +157,56 @@ contract HostelHappy {
         Host storage h = hosts[hostId];
         if (h.host == address(0)) revert NotFound();
         if (h.host != msg.sender) revert NotHost();
+        if (newProfileHash == bytes32(0)) revert BadInput();
+
+        h.profileHash = newProfileHash;
+        emit HostelProfileUpdated(hostId, newProfileHash);
+    }
+
+    function setHostActive(bytes32 hostId, bool active_) external whenNotPaused {
+        Host storage h = hosts[hostId];
+        if (h.host == address(0)) revert NotFound();
+        if (h.host != msg.sender) revert NotHost();
+
+        h.active = active_;
+        emit HostelActiveSet(hostId, active_);
+    }
+
+    // ============
+    // Rooms
+    // ============
+    function upsertRoom(
+        bytes32 hostId,
+        uint32 roomNo,
+        uint32 nightlyPriceWei,
+        uint16 maxGuests,
+        bool active_
+    ) external whenNotPaused {
+        Host storage h = hosts[hostId];
+        if (h.host == address(0)) revert NotFound();
+        if (!h.active) revert NotActive();
+        if (h.host != msg.sender) revert NotHost();
+
+        if (roomNo == 0) revert BadInput();
+        if (maxGuests == 0) revert BadInput();
+
+        Room storage r = rooms[hostId][roomNo];
+        if (!r.exists) {
+            h.roomCount += 1;
+            r.exists = true;
+        }
+
+        r.nightlyPriceWei = nightlyPriceWei;
+        r.maxGuests = maxGuests;
+        r.active = active_;
+
+        emit RoomUpserted(hostId, roomNo, nightlyPriceWei, maxGuests);
+        emit RoomActiveSet(hostId, roomNo, active_);
+    }
+
+    function setRoomActive(bytes32 hostId, uint32 roomNo, bool active_) external whenNotPaused {
+        Host storage h = hosts[hostId];
+        if (h.host == address(0)) revert NotFound();
+        if (h.host != msg.sender) revert NotHost();
+
+        Room storage r = rooms[hostId][roomNo];
