@@ -210,3 +210,56 @@ contract HostelHappy {
         if (h.host != msg.sender) revert NotHost();
 
         Room storage r = rooms[hostId][roomNo];
+        if (!r.exists) revert NotFound();
+
+        r.active = active_;
+        emit RoomActiveSet(hostId, roomNo, active_);
+    }
+
+    // ============
+    // Bookings (no payments, no custody)
+    // ============
+    function computeBookingId(
+        bytes32 hostId,
+        uint32 roomNo,
+        address booker,
+        uint40 checkInDay,
+        uint40 checkOutDay,
+        uint16 guests,
+        bytes32 offchainPaymentRef,
+        uint64 createdAt
+    ) public pure returns (bytes32) {
+        return keccak256(
+            abi.encodePacked(
+                _BOOKING_SALT,
+                hostId,
+                roomNo,
+                booker,
+                checkInDay,
+                checkOutDay,
+                guests,
+                offchainPaymentRef,
+                createdAt
+            )
+        );
+    }
+
+    function requestBooking(
+        bytes32 hostId,
+        uint32 roomNo,
+        uint40 checkInDay,
+        uint40 checkOutDay,
+        uint16 guests,
+        bytes32 offchainPaymentRef
+    ) external whenNotPaused returns (bytes32 bookingId) {
+        Host storage h = hosts[hostId];
+        if (h.host == address(0)) revert NotFound();
+        if (!h.active) revert NotActive();
+
+        Room storage r = rooms[hostId][roomNo];
+        if (!r.exists) revert NotFound();
+        if (!r.active) revert NotActive();
+
+        if (guests == 0 || guests > r.maxGuests) revert BadInput();
+        if (checkOutDay <= checkInDay) revert BadInput();
+        if (offchainPaymentRef == bytes32(0)) revert BadInput();
