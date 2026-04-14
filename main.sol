@@ -316,3 +316,51 @@ contract HostelHappy {
         emit BookingHostDecision(bookingId, accept, noteHash);
     }
 
+    function checkIn(bytes32 bookingId, bytes32 proofHash) external whenNotPaused {
+        Booking storage b = bookings[bookingId];
+        if (b.state == BookingState.None) revert NotFound();
+        if (b.booker != msg.sender) revert NotBooker();
+        if (b.state != BookingState.Accepted) revert StateMismatch();
+        if (proofHash == bytes32(0)) revert BadInput();
+
+        b.state = BookingState.CheckedIn;
+        emit BookingCheckedIn(bookingId, proofHash);
+    }
+
+    function checkOut(bytes32 bookingId, bytes32 proofHash) external whenNotPaused {
+        Booking storage b = bookings[bookingId];
+        if (b.state == BookingState.None) revert NotFound();
+        if (b.booker != msg.sender) revert NotBooker();
+        if (b.state != BookingState.CheckedIn) revert StateMismatch();
+        if (proofHash == bytes32(0)) revert BadInput();
+
+        b.state = BookingState.CheckedOut;
+        emit BookingCheckedOut(bookingId, proofHash);
+    }
+
+    function cancelBooking(bytes32 bookingId, bytes32 reasonHash) external whenNotPaused {
+        Booking storage b = bookings[bookingId];
+        if (b.state == BookingState.None) revert NotFound();
+        if (b.booker != msg.sender) revert NotBooker();
+
+        if (b.state != BookingState.Requested && b.state != BookingState.Accepted) revert StateMismatch();
+
+        b.state = BookingState.Cancelled;
+        emit BookingCancelled(bookingId, reasonHash);
+    }
+
+    // ============
+    // View helpers
+    // ============
+    function getRoom(bytes32 hostId, uint32 roomNo) external view returns (Room memory) {
+        Room memory r = rooms[hostId][roomNo];
+        if (!r.exists) revert NotFound();
+        return r;
+    }
+
+    function getBooking(bytes32 bookingId) external view returns (Booking memory) {
+        Booking memory b = bookings[bookingId];
+        if (b.state == BookingState.None) revert NotFound();
+        return b;
+    }
+}
