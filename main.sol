@@ -104,3 +104,56 @@ contract HostelHappy {
         bytes32 hostId;
         uint32 roomNo;
         address booker;
+        uint40 checkInDay; // days since Unix epoch (UTC)
+        uint40 checkOutDay; // exclusive
+        uint16 guests;
+        bytes32 offchainPaymentRef;
+        BookingState state;
+        uint64 createdAt;
+    }
+
+    mapping(bytes32 => Host) public hosts;
+    mapping(bytes32 => mapping(uint32 => Room)) public rooms;
+    mapping(bytes32 => Booking) public bookings;
+
+    constructor() {
+        OWNER = msg.sender;
+    }
+
+    receive() external payable {
+        revert EtherNotAccepted();
+    }
+
+    fallback() external payable {
+        revert EtherNotAccepted();
+    }
+
+    // ============
+    // Admin
+    // ============
+    function setPaused(bool value) external onlyOwner {
+        paused = value;
+        emit PauseSet(value);
+    }
+
+    // ============
+    // Host identity + profile
+    // ============
+    function computeHostId(address host, bytes32 profileHash) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_HOST_SALT, host, profileHash));
+    }
+
+    function registerHost(bytes32 profileHash) external whenNotPaused returns (bytes32 hostId) {
+        if (profileHash == bytes32(0)) revert BadInput();
+
+        hostId = computeHostId(msg.sender, profileHash);
+        if (hosts[hostId].host != address(0)) revert AlreadyExists();
+
+        hosts[hostId] = Host({host: msg.sender, profileHash: profileHash, active: true, roomCount: 0});
+        emit HostelRegistered(hostId, msg.sender, profileHash);
+    }
+
+    function updateHostProfile(bytes32 hostId, bytes32 newProfileHash) external whenNotPaused {
+        Host storage h = hosts[hostId];
+        if (h.host == address(0)) revert NotFound();
+        if (h.host != msg.sender) revert NotHost();
