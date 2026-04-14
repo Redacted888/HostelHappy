@@ -263,3 +263,56 @@ contract HostelHappy {
         if (guests == 0 || guests > r.maxGuests) revert BadInput();
         if (checkOutDay <= checkInDay) revert BadInput();
         if (offchainPaymentRef == bytes32(0)) revert BadInput();
+
+        uint64 createdAt = uint64(block.timestamp);
+        bookingId = computeBookingId(
+            hostId,
+            roomNo,
+            msg.sender,
+            checkInDay,
+            checkOutDay,
+            guests,
+            offchainPaymentRef,
+            createdAt
+        );
+
+        if (bookings[bookingId].state != BookingState.None) revert AlreadyExists();
+
+        bookings[bookingId] = Booking({
+            hostId: hostId,
+            roomNo: roomNo,
+            booker: msg.sender,
+            checkInDay: checkInDay,
+            checkOutDay: checkOutDay,
+            guests: guests,
+            offchainPaymentRef: offchainPaymentRef,
+            state: BookingState.Requested,
+            createdAt: createdAt
+        });
+
+        emit BookingRequested(
+            bookingId,
+            hostId,
+            roomNo,
+            msg.sender,
+            checkInDay,
+            checkOutDay,
+            guests,
+            offchainPaymentRef
+        );
+    }
+
+    function hostDecideBooking(bytes32 bookingId, bool accept, bytes32 noteHash) external whenNotPaused {
+        Booking storage b = bookings[bookingId];
+        if (b.state == BookingState.None) revert NotFound();
+
+        Host storage h = hosts[b.hostId];
+        if (h.host == address(0)) revert NotFound();
+        if (h.host != msg.sender) revert NotHost();
+
+        if (b.state != BookingState.Requested) revert StateMismatch();
+
+        b.state = accept ? BookingState.Accepted : BookingState.Rejected;
+        emit BookingHostDecision(bookingId, accept, noteHash);
+    }
+
